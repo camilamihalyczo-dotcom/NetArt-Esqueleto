@@ -1,0 +1,506 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&family=Space+Mono:ital@0;1&display=swap');
+
+  :root {
+    --black: #050505;
+    --green: #00ff41;
+    --green-dim: #00aa2a;
+    --green-faint: #003309;
+    --magenta: #ff00ff;
+    --mag-dim: #aa00aa;
+    --cyan: #00ffff;
+    --white: #e8ffe8;
+    --scan: rgba(0,0,0,0.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--black);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  /* CRT scanlines overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      var(--scan) 2px,
+      var(--scan) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Phosphor glow effect */
+  @keyframes flicker {
+    0%,100% { opacity:1 }
+    92% { opacity:0.97 }
+    94% { opacity:0.85 }
+    96% { opacity:0.97 }
+  }
+
+  @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+  @keyframes glitch {
+    0%,90%,100% { transform: translate(0) skew(0deg); clip-path: none; }
+    91% { transform: translate(-2px,1px) skew(-1deg); clip-path: inset(30% 0 50% 0); }
+    93% { transform: translate(2px,-1px) skew(1deg); clip-path: inset(60% 0 10% 0); }
+    95% { transform: translate(-1px,2px); clip-path: inset(10% 0 70% 0); }
+  }
+  @keyframes scan-pass {
+    0% { top: -10%; }
+    100% { top: 110%; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .screen {
+    animation: flicker 8s infinite;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  /* Scan line that moves */
+  .scan-line {
+    position: fixed;
+    left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(transparent, rgba(0,255,65,0.08), transparent);
+    animation: scan-pass 6s linear infinite;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 2rem 2rem 1.5rem;
+    border-bottom: 1px solid var(--green-dim);
+    position: relative;
+    overflow: hidden;
+  }
+  .header-glitch {
+    font-family: 'VT323', monospace;
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green), 0 0 40px var(--green-dim);
+    animation: glitch 7s infinite;
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+  .header-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--green-dim);
+    margin-top: 0.5rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .header-sub span { color: var(--magenta); }
+  .cursor {
+    display: inline-block;
+    width: 10px; height: 1.1em;
+    background: var(--green);
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+    margin-left: 4px;
+  }
+
+  /* NAV PROMPT */
+  .nav-prompt {
+    padding: 0.5rem 2rem;
+    font-size: 0.7rem;
+    color: var(--green-dim);
+    background: var(--green-faint);
+    letter-spacing: 0.1em;
+    display: flex; gap: 2rem; flex-wrap: wrap;
+  }
+  .nav-prompt span { color: var(--green); }
+
+  /* TAXONOMY LABEL */
+  .taxonomy-label {
+    padding: 1.5rem 2rem 0.75rem;
+    font-size: 0.65rem;
+    color: var(--mag-dim);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* GRID */
+  .netiana-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1px;
+    padding: 0 2rem 2rem;
+    background: var(--green-faint);
+  }
+
+  .netiana-node {
+    background: var(--black);
+    padding: 1.2rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+    position: relative;
+    transition: all 0.08s;
+    animation: fadeIn 0.4s ease both;
+  }
+  .netiana-node:hover {
+    border-color: var(--green);
+    background: #001a00;
+    box-shadow: inset 0 0 20px rgba(0,255,65,0.05), 0 0 15px rgba(0,255,65,0.1);
+  }
+  .netiana-node.active {
+    border-color: var(--magenta);
+    background: #1a001a;
+    box-shadow: inset 0 0 20px rgba(255,0,255,0.05), 0 0 20px rgba(255,0,255,0.15);
+  }
+  .netiana-node:nth-child(2n) { animation-delay: 0.05s; }
+  .netiana-node:nth-child(3n) { animation-delay: 0.1s; }
+  .netiana-node:nth-child(4n) { animation-delay: 0.15s; }
+  .netiana-node:nth-child(5n) { animation-delay: 0.2s; }
+
+  .node-letter {
+    font-family: 'VT323', monospace;
+    font-size: 1.8rem;
+    color: var(--mag-dim);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+  .netiana-node.active .node-letter { color: var(--magenta); }
+  .netiana-node:hover .node-letter { color: var(--green); }
+
+  .node-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+  }
+  .node-desc {
+    font-size: 0.6rem;
+    color: var(--green-dim);
+    line-height: 1.6;
+  }
+  .netiana-node:hover .node-desc { color: var(--green); }
+
+  .node-links {
+    display: none;
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--green-dim);
+    font-size: 0.55rem;
+    color: var(--mag-dim);
+    letter-spacing: 0.05em;
+  }
+  .netiana-node.active .node-links { display: block; }
+  .node-link {
+    display: block;
+    color: var(--magenta);
+    margin: 3px 0;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .node-link::before { content: '→ '; }
+  .node-link:hover { text-shadow: 0 0 8px var(--magenta); }
+
+  /* DETAIL PANEL */
+  .detail-panel {
+    margin: 0 2rem 2rem;
+    border: 1px solid var(--green-dim);
+    padding: 1.5rem;
+    display: none;
+    animation: fadeIn 0.25s ease;
+    position: relative;
+    background: #020d02;
+  }
+  .detail-panel.visible { display: block; }
+  .detail-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    right: 0; height: 2px;
+    background: var(--magenta);
+    box-shadow: 0 0 10px var(--magenta);
+  }
+  .detail-close {
+    position: absolute;
+    top: 0.75rem; right: 1rem;
+    cursor: pointer;
+    color: var(--green-dim);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+  }
+  .detail-close:hover { color: var(--magenta); }
+  .detail-letter {
+    font-family: 'VT323', monospace;
+    font-size: 3rem;
+    color: var(--magenta);
+    text-shadow: 0 0 20px var(--magenta);
+    line-height: 1;
+  }
+  .detail-name {
+    font-family: 'VT323', monospace;
+    font-size: 1.6rem;
+    color: var(--green);
+    text-shadow: 0 0 10px var(--green);
+    margin-bottom: 1rem;
+  }
+  .detail-body {
+    font-size: 0.7rem;
+    color: var(--white);
+    line-height: 1.8;
+    margin-bottom: 1rem;
+    max-width: 680px;
+  }
+  .detail-body em { color: var(--magenta); font-style: normal; }
+  .detail-connections {
+    font-size: 0.6rem;
+    color: var(--green-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-top: 1px solid var(--green-faint);
+    padding-top: 0.75rem;
+  }
+  .conn-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid var(--green-dim);
+    color: var(--green-dim);
+    margin: 3px;
+    font-size: 0.55rem;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .conn-tag:hover {
+    border-color: var(--magenta);
+    color: var(--magenta);
+    box-shadow: 0 0 8px rgba(255,0,255,0.3);
+  }
+
+  /* FOOTER */
+  .footer {
+    padding: 1rem 2rem;
+    border-top: 1px solid var(--green-faint);
+    font-size: 0.55rem;
+    color: #002800;
+    letter-spacing: 0.1em;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .footer span { color: #004d00; }
+
+  /* Glitch text effect for hover */
+  @keyframes textGlitch {
+    0%,100% { text-shadow: 0 0 5px var(--green); }
+    25% { text-shadow: 2px 0 0 var(--magenta), -2px 0 0 var(--cyan); }
+    50% { text-shadow: -1px 0 0 var(--magenta), 1px 0 0 var(--cyan); }
+    75% { text-shadow: 0 0 10px var(--green); }
+  }
+  .netiana-node:hover .node-name {
+    animation: textGlitch 0.3s ease;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--black); }
+  ::-webkit-scrollbar-thumb { background: var(--green-dim); }
+</style>
+</head>
+<body>
+<div class="scan-line"></div>
+<div class="screen">
+
+  <div class="header">
+    <div class="header-glitch">N(H)ACER MUJER<span class="cursor"></span></div>
+    <div class="header-glitch" style="color:var(--magenta);text-shadow:0 0 20px var(--magenta),0 0 40px var(--mag-dim);font-size:clamp(1.2rem,3vw,2rem);margin-top:4px;">EN INTERNET</div>
+    <div class="header-sub" style="margin-top:1rem;">
+      obra net.art · <span>remedios zafra</span> · antitaxonomía rizomática ·
+      navegar es devenir · <span>14 mesetas</span> · ningún centro ·
+    </div>
+  </div>
+
+  <div class="nav-prompt">
+    <span>SYS:</span> seleccionar nodo para iniciar recorrido &nbsp;|&nbsp;
+    <span>WARN:</span> no existe orden correcto &nbsp;|&nbsp;
+    <span>STATUS:</span> hipertexto activo &nbsp;|&nbsp;
+    <span>USER:</span> sujeto en devenir<span style="animation:blink 1s infinite;display:inline-block">_</span>
+  </div>
+
+  <div class="taxonomy-label">// TAXONOMÍA ABIERTA DE LAS NETIANAS (ANTITAXONOMÍA) — según Borges via Zafra</div>
+
+  <div class="netiana-grid" id="grid"></div>
+  <div class="detail-panel" id="detail">
+    <div class="detail-close" onclick="closeDetail()">[ CERRAR × ]</div>
+    <div class="detail-letter" id="d-letter"></div>
+    <div class="detail-name" id="d-name"></div>
+    <div class="detail-body" id="d-body"></div>
+    <div class="detail-connections">
+      <div style="margin-bottom:6px;color:#004d00;">// conexiones rizomáticas →</div>
+      <div id="d-tags"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>NETIANAS.NET</span> · sistema sin jerarquía ·
+    <span>ZAFRA, R. (2005)</span> · todos los recorridos son válidos ·
+    <span>©</span> el código como cuerpo
+  </div>
+</div>
+
+<script>
+const data = [
+  {
+    l:"(A)", name:"Pertenecientes a Microsoft",
+    desc:"Atrapadas en las cadenas magenta y dorado del sistema. Leen esteganográficamente el poder oculto en el software.",
+    body:"Viven bajo papá Microsoft. El sistema operativo como dispositivo patriarcal. La ideología viaja en el código, invisible como el aire, hegemónica como la gravedad. La netiana perteneciente a Microsoft no es una infiltrada desde afuera: surge desde el limen del mismo sistema que la contiene. <em>Lee lo ilegible.</em> Advierte el peligro que se mimetiza con el paisaje.",
+    tags:["poder corporativo","esteganografía","limen","software libre","patriarcado digital"]
+  },
+  {
+    l:"(B)", name:"Latentes",
+    desc:"La pantalla como jardín secreto. El doble vector: exceso de lo virtual / búsqueda de lo real.",
+    body:"¿Qué internauta no lleva una netiana dentro? La pantalla como hogar íntimo, como jardín secreto donde caer lejos del cuerpo. La netiana latente vive en la tensión entre el exceso de virtualidad y la búsqueda de lo real. <em>El maquillaje como cirugía del alma.</em> Anular los propios ojos para ver con otros ojos.",
+    tags:["pantalla","cuerpo","jardín secreto","virtualidad","Kristeva"]
+  },
+  {
+    l:"(C)", name:"Inventadas",
+    desc:"No se nace netiana: se hace. Cuerpos-texto, performatividad, desidentificación sexual.",
+    body:"No precisa de cuerpo virtual antropomorfizado. <em>No se nace netiana: se hace netiana.</em> Las netianas inventadas son ficción que se produce en el mismo territorio del discurso que pretende modificar. La performatividad (Butler) opera: el género se enuncia y al enunciarse se realiza. En internet, reversible.",
+    tags:["Butler","performatividad","cuerpo-texto","ficción","desidentificación"]
+  },
+  {
+    l:"(D)", name:"Prosopon",
+    desc:"La máscara griega. Identidad como actuación. El avatar como puesta en escena del yo.",
+    body:"Prosopon: la máscara del teatro griego que da nombre a la persona. Online, toda presencia es máscara. La netiana prosopon habita ese espacio entre el disfraz y el detrás del escenario. <em>Postmascarada.</em> El lugar donde el cansancio de representar permite, finalmente, ser.",
+    tags:["máscara","avatar","persona","representación","teatralidad digital"]
+  },
+  {
+    l:"(E)", name:"Cyborgs",
+    desc:"Herederas de Haraway. La frontera borrosa entre cuerpo y máquina como posición política.",
+    body:"Heredera directa del Manifiesto Cyborg de Donna Haraway. El cyborg: irónicamente comprometido con la parcialidad, la ironía, la intimidad y la perversidad. <em>Infieles a su parentesco patriarcal.</em> La netiana cyborg habita la frontera entre lo orgánico y lo digital sin nostalgia por ninguno de los dos lados.",
+    tags:["Haraway","cyborg","posthumano","cuerpo-máquina","frontera"]
+  },
+  {
+    l:"(F)", name:"«Fabulosas»",
+    desc:"Lo que el patriarcado no puede clasificar. Irrupción de lo fantástico y lo no-normativo.",
+    body:"Las fabulosas no caben en ninguna categoría. Son lo que desborda, lo que excede, lo que la taxonomía patriarcal no puede contener. <em>Herederas del etcétera de Borges.</em> Su existencia es una grieta en el sistema. Aparecen donde no deberían y proliferan donde se las niega.",
+    tags:["queer","exceso","no-normativo","irrupción","Borges"]
+  },
+  {
+    l:"(G)", name:"Google",
+    desc:"Sujeto de la vigilancia algorítmica. Identidad reducida a dato, búsqueda, perfil.",
+    body:"La netiana Google existe como conjunto de búsquedas. Su identidad: un historial, un perfil, una cookie. <em>Sujeto que se produce en la mirada del algoritmo.</em> Google como nuevo gran hermano, suave, sin rostro, sin nombre. La vigilancia como servicio. El dato como cuerpo.",
+    tags:["algoritmo","vigilancia","dato","perfil","biopolítica"]
+  },
+  {
+    l:"(H)", name:"Incluidas en esta clasificación",
+    desc:"Giro autoconsciente: la netiana sabe que está siendo taxonomizada. Lo subvierte.",
+    body:"El momento en que la taxonomía se mira a sí misma y ríe. La netiana incluida en esta clasificación sabe que está siendo nombrada, que al nombrarse está siendo constituida. <em>Performatividad consciente.</em> La ironia como estrategia: si todo intento de clasificarme me constituye, que sea yo quien lo haga primero.",
+    tags:["metaficcción","ironía","clasificación","performatividad","autoconciencia"]
+  },
+  {
+    l:"(I)", name:"Chateadoras compulsivas",
+    desc:"El chat como desbordamiento. Tiempo disuelto, identidad proliferante, presencia sin cuerpo.",
+    body:"El chat como modo de existencia. Las netianas chateadoras pasan más tiempo siendo <em>otras</em> que siendo ellas mismas. La identidad prolifera, se multiplica, se contradice. El tiempo de conexión supera al tiempo offline. ¿Cuál es el original?",
+    tags:["chat","multiplicidad","tiempo","identidad online","presencia"]
+  },
+  {
+    l:"(J)", name:"Incontables",
+    desc:"La multiplicidad como resistencia. Lo que no puede ser capturado por ningún sistema de conteo.",
+    body:"Las incontables son lo que excede toda estadística, todo censo, toda métrica de plataforma. <em>Resistencia por multiplicidad.</em> Como los rizomas: sin principio ni fin. Cada netiana incontable es una línea de fuga que escapa a la captura del dato.",
+    tags:["multiplicidad","rizoma","líneas de fuga","Deleuze","incontabilidad"]
+  },
+  {
+    l:"(K)", name:"Descritas en Times New Roman",
+    desc:"La tipografía como ideología. El formato académico como dispositivo de poder invisible.",
+    body:"Times New Roman: la letra del saber legítimo. El ensayo, la tesis, el informe. La netiana descrita en Times New Roman es aquella cuya existencia requiere ser validada por el discurso académico para poder existir. <em>La forma como contenido ideológico.</em> El font como régimen.",
+    tags:["tipografía","academia","legitimidad","poder","formato"]
+  },
+  {
+    l:"(L)", name:"Etcétera",
+    desc:"El etcétera como apertura radical. La lista nunca se cierra. Siempre hay más.",
+    body:"El etcétera de Borges, recuperado por Zafra: apertura radical que impide el cierre. La netiana etcétera es la que siempre falta, la que viene después. <em>La taxonomía como promesa incumplible.</em> Cualquier lista de identidades es provisional. El etcétera es la democracia de lo no-dicho.",
+    tags:["apertura","Borges","lista","indeterminación","porvenir"]
+  },
+  {
+    l:"(M)", name:"Que entran en Silicon Valley",
+    desc:"La ilusión meritocrática. La mujer tech como anomalía tolerada por el sistema.",
+    body:"La netiana que entra en Silicon Valley descubre que el garaje era solo de chicos. La meritocracia: un sistema diseñado para producir siempre el mismo ganador. <em>Ingresan como anomalía, se quedan como excepción que confirma la regla.</em> Su presencia normaliza sin transformar.",
+    tags:["Silicon Valley","meritocracia","tech","género","neoliberalismo"]
+  },
+  {
+    l:"(N)", name:"Que viven lo que una mosca",
+    desc:"Efímera duración de las identidades online. Devenir-mosca deleuziano. Obsolescencia del sujeto.",
+    body:"Las que viven lo que una mosca: la efímera duración de los perfiles, las identidades online, los devenires digitales. <em>Devenir-animal, devenir-molecular.</em> Una netiana de hace unos meses deja de estar 'a la moda'. Velocidad de obsolescencia = velocidad de los sistemas operativos. La muerte programada del sujeto conectado.",
+    tags:["efímero","obsolescencia","Deleuze","devenir-animal","mosca"]
+  }
+];
+
+let activeIdx = null;
+
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  data.forEach((n, i) => {
+    const d = document.createElement('div');
+    d.className = 'netiana-node';
+    d.style.animationDelay = (i*0.03)+'s';
+    d.innerHTML = `
+      <div class="node-letter">${n.l}</div>
+      <div class="node-name">${n.name}</div>
+      <div class="node-desc">${n.desc}</div>
+      <div class="node-links">
+        <span class="node-link">ver meseta completa</span>
+        <span class="node-link">conexiones rizomáticas</span>
+      </div>
+    `;
+    d.addEventListener('click', () => openDetail(i, d));
+    grid.appendChild(d);
+  });
+}
+
+function openDetail(i, el) {
+  // deactivate all
+  document.querySelectorAll('.netiana-node').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  activeIdx = i;
+
+  const n = data[i];
+  document.getElementById('d-letter').textContent = n.l;
+  document.getElementById('d-name').textContent = n.name.toUpperCase();
+  document.getElementById('d-body').innerHTML = n.body;
+  document.getElementById('d-tags').innerHTML = n.tags.map(t =>
+    `<span class="conn-tag">${t}</span>`
+  ).join('');
+
+  const panel = document.getElementById('detail');
+  panel.classList.add('visible');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeDetail() {
+  document.getElementById('detail').classList.remove('visible');
+  document.querySelectorAll('.netiana-node').forEach(n => n.classList.remove('active'));
+  activeIdx = null;
+}
+
+buildGrid();
+</script>
+</body>
+</html>
