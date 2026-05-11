@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLASIFICADORA NETIANA</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --black: #050505;
+  --green: #00ff41;
+  --gd: #00aa2a;
+  --gf: #001200;
+  --mag: #ff00ff;
+  --magd: #880088;
+  --cyan: #00ffff;
+  --white: #e0ffe0;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--black);color:var(--green);font-family:'Share Tech Mono',monospace;overflow:hidden;}
+
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);
+  pointer-events:none;z-index:9000;
+}
+#scan{position:fixed;left:0;right:0;height:3px;background:linear-gradient(transparent,rgba(0,255,65,.08),transparent);pointer-events:none;z-index:8999;animation:scanmove 7s linear infinite;}
+@keyframes scanmove{0%{top:-2%}100%{top:102%}}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes glitch{
+  0%,88%,100%{transform:translate(0);clip-path:none}
+  89%{transform:translate(-3px,1px);clip-path:inset(20% 0 50% 0)}
+  91%{transform:translate(3px,-1px);clip-path:inset(60% 0 10% 0)}
+}
+@keyframes typechar{from{width:0}to{width:100%}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,255,65,.2)}50%{box-shadow:0 0 0 8px rgba(0,255,65,0)}}
+
+/* ── LAYOUT ── */
+#app{
+  display:flex;flex-direction:column;height:100%;
+  max-width:700px;margin:0 auto;padding:0;
+}
+
+/* header */
+.hd{
+  padding:.8rem 1.2rem .6rem;
+  border-bottom:1px solid var(--gd);
+  flex-shrink:0;
+}
+.hd-title{
+  font-family:'VT323',monospace;
+  font-size:clamp(1.6rem,5vw,2.4rem);
+  color:var(--green);
+  text-shadow:0 0 15px var(--green);
+  animation:glitch 9s infinite;
+  line-height:1;
+  letter-spacing:.04em;
+}
+.hd-title .mg{color:var(--mag);text-shadow:0 0 15px var(--mag);}
+.hd-sub{font-size:.6rem;color:var(--gd);letter-spacing:.12em;margin-top:3px;}
+
+/* progress */
+.prog-bar{
+  height:2px;background:var(--gf);
+  position:relative;flex-shrink:0;
+}
+.prog-fill{
+  height:100%;background:var(--green);
+  box-shadow:0 0 6px var(--green);
+  transition:width .4s ease;
+  width:0%;
+}
+.prog-txt{
+  font-size:.5rem;color:var(--gd);
+  padding:.3rem 1.2rem;
+  letter-spacing:.1em;
+  flex-shrink:0;
+  display:flex;justify-content:space-between;
+}
+
+/* main content */
+.main{
+  flex:1;overflow-y:auto;padding:1.5rem 1.2rem;
+  display:flex;flex-direction:column;
+  scrollbar-width:thin;scrollbar-color:var(--gd) var(--black);
+}
+.main::-webkit-scrollbar{width:3px;}
+.main::-webkit-scrollbar-thumb{background:var(--gd);}
+
+/* question */
+.q-wrap{animation:fadein .25s ease;}
+.q-num{font-size:.55rem;color:var(--magd);letter-spacing:.15em;text-transform:uppercase;margin-bottom:.5rem;}
+.q-text{
+  font-family:'VT323',monospace;
+  font-size:clamp(1.4rem,4vw,2rem);
+  color:var(--white);
+  line-height:1.3;
+  margin-bottom:.5rem;
+}
+.q-hint{font-size:.6rem;color:var(--gd);line-height:1.6;margin-bottom:1.5rem;}
+
+/* answer buttons */
+.ans-wrap{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:1.5rem;}
+.ans-btn{
+  flex:1;min-width:120px;
+  background:none;
+  border:1px solid var(--gd);
+  color:var(--green);
+  font-family:'Share Tech Mono',monospace;
+  font-size:clamp(.75rem,2.5vw,.9rem);
+  padding:.7rem 1rem;
+  cursor:pointer;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  transition:all .1s;
+  position:relative;
+  overflow:hidden;
+}
+.ans-btn::before{
+  content:'';position:absolute;inset:0;
+  background:var(--green);opacity:0;
+  transition:opacity .1s;
+}
+.ans-btn:hover{border-color:var(--green);box-shadow:0 0 12px rgba(0,255,65,.2);animation:pulse 1s infinite;}
+.ans-btn:hover::before{opacity:.06;}
+.ans-btn.yes{border-color:var(--cyan);color:var(--cyan);}
+.ans-btn.yes:hover{box-shadow:0 0 12px rgba(0,255,255,.2);}
+.ans-btn.no{border-color:var(--mag);color:var(--mag);}
+.ans-btn.no:hover{box-shadow:0 0 12px rgba(255,0,255,.2);}
+
+/* skip */
+.skip-btn{
+  background:none;border:none;
+  color:#003300;font-family:'Share Tech Mono',monospace;
+  font-size:.55rem;cursor:pointer;letter-spacing:.08em;
+  transition:color .1s;padding:.3rem 0;
+  align-self:flex-start;
+}
+.skip-btn:hover{color:var(--gd);}
+
+/* history trail */
+.trail{margin-top:1rem;border-top:1px solid var(--gf);padding-top:.8rem;}
+.trail-lbl{font-size:.5rem;color:#002200;letter-spacing:.12em;margin-bottom:.4rem;}
+.trail-item{
+  font-size:.55rem;color:#002800;margin-bottom:3px;
+  display:flex;gap:.5rem;
+}
+.trail-item .tq{flex:1;}
+.trail-item .ta{color:var(--gd);}
+
+/* ── RESULTS ── */
+.result-wrap{animation:fadein .3s ease;}
+.result-header{
+  font-size:.55rem;color:var(--magd);letter-spacing:.2em;
+  text-transform:uppercase;margin-bottom:.8rem;
+}
+.result-primary{
+  border:1px solid var(--mag);
+  border-top:3px solid var(--mag);
+  background:#0d000d;
+  padding:1.2rem;
+  margin-bottom:1rem;
+  position:relative;
+}
+.result-primary::before{
+  content:'MEJOR COINCIDENCIA';
+  position:absolute;top:-.55rem;left:1rem;
+  background:var(--black);
+  padding:0 .5rem;
+  font-size:.5rem;color:var(--magd);letter-spacing:.12em;
+}
+.r-letter{font-family:'VT323',monospace;font-size:3.5rem;color:var(--mag);text-shadow:0 0 15px var(--mag);line-height:1;}
+.r-alias{font-family:'VT323',monospace;font-size:1.8rem;color:var(--cyan);line-height:1.1;margin-bottom:.3rem;}
+.r-name{font-size:.7rem;color:var(--green);text-transform:uppercase;margin-bottom:.8rem;}
+.r-why{font-size:.65rem;color:var(--white);line-height:1.8;}
+.r-why em{color:var(--mag);font-style:normal;}
+
+.result-scores{margin-top:1rem;}
+.score-row{
+  display:flex;align-items:center;gap:.7rem;
+  margin-bottom:6px;
+}
+.score-letter{font-family:'VT323',monospace;font-size:1rem;color:var(--magd);min-width:2.5rem;}
+.score-alias{font-size:.58rem;color:var(--gd);min-width:80px;}
+.score-bar-wrap{flex:1;height:6px;background:#001200;border-radius:0;}
+.score-bar{height:100%;background:var(--gd);transition:width .6s ease;border-radius:0;}
+.score-bar.top{background:var(--mag);box-shadow:0 0 6px var(--mag);}
+.score-val{font-size:.55rem;color:var(--gd);min-width:2.5rem;text-align:right;}
+
+.result-tags{margin-top:.8rem;}
+.rt-lbl{font-size:.5rem;color:var(--magd);letter-spacing:.14em;text-transform:uppercase;margin-bottom:.4rem;}
+.rt-wrap{display:flex;flex-wrap:wrap;gap:5px;}
+.rt-tag{
+  border:1px solid var(--gd);color:var(--gd);
+  font-size:.55rem;padding:2px 8px;font-family:'Share Tech Mono',monospace;
+}
+
+.restart-btn{
+  margin-top:1.2rem;
+  background:none;border:1px solid var(--green);color:var(--green);
+  font-family:'Share Tech Mono',monospace;font-size:.7rem;
+  padding:.65rem 1.2rem;cursor:pointer;letter-spacing:.08em;
+  text-transform:uppercase;transition:all .1s;
+  width:100%;
+}
+.restart-btn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 10px rgba(0,255,255,.15);}
+
+/* border separator */
+.sep{height:1px;background:linear-gradient(to right,var(--gd),transparent);margin:1rem 0;}
+</style>
+</head>
+<body>
+<div id="scan"></div>
+<div id="app">
+  <div class="hd">
+    <div class="hd-title">CLASIFICADORA <span class="mg">NETIANA</span></div>
+    <div class="hd-sub">// sistema de identificación · 14 mesetas · responde sí o no</div>
+  </div>
+  <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
+  <div class="prog-txt">
+    <span id="prog-label">pregunta 0 / 0</span>
+    <span id="prog-confidence">confianza: —</span>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   NETIANAS
+═══════════════════════════════════════ */
+const NETIANAS = {
+  A:{ l:"(A)", a:"Artivista",     n:"Pertenecientes a Microsoft",  color:"#00ff41" },
+  B:{ l:"(B)", a:"Buscadora",     n:"Latentes",                    color:"#00ccff" },
+  C:{ l:"(C)", a:"Cyborg",        n:"Inventadas",                  color:"#ff44ff" },
+  D:{ l:"(D)", a:"Doméstica",     n:"Prosopon",                    color:"#ffaa00" },
+  E:{ l:"(E)", a:"Esteganógrafa", n:"Cyborgs",                     color:"#00ffaa" },
+  F:{ l:"(F)", a:"Flâneuse",      n:"«Fabulosas»",                 color:"#aaff00" },
+  G:{ l:"(G)", a:"Geek",          n:"Google",                      color:"#ff6600" },
+  H:{ l:"(H)", a:"Hacktivista",   n:"Incluidas en esta clasificación", color:"#ff0066" },
+  I:{ l:"(I)", a:"Invisible",     n:"Chateadoras compulsivas",     color:"#6600ff" },
+  J:{ l:"(J)", a:"Jinetera",      n:"Incontables",                 color:"#ffff00" },
+  K:{ l:"(K)", a:"Karaokista",    n:"Descritas en Times New Roman",color:"#00ffff" },
+  L:{ l:"(L)", a:"Lurker",        n:"Etcétera",                    color:"#ff00aa" },
+  M:{ l:"(M)", a:"Multitud",      n:"Que entran en Silicon Valley",color:"#00aaff" },
+  N:{ l:"(N)", a:"Nómade",        n:"Que viven lo que una mosca",  color:"#aa00ff" },
+};
+
+/* ═══════════════════════════════════════
+   PREGUNTAS
+   cada pregunta tiene:
+   - id: clave única
+   - q: pregunta
+   - hint: aclaración opcional
+   - yes: qué netianas suman puntos si es SÍ (y cuánto)
+   - no:  qué netianas suman puntos si es NO
+═══════════════════════════════════════ */
+const QUESTIONS = [
+  // ── BLOQUE 1: acción política ──
+  { id:"accion_politica",
+    q:"¿Su trabajo tiene una intención política explícita?",
+    hint:"Se posiciona, denuncia, interviene o propone cambio social — no solo crea.",
+    yes:{ A:3, H:3, J:2, M:2, F:1, G:1, K:1 },
+    no: { B:2, D:2, I:2, L:2, N:1, E:1 }
+  },
+  { id:"accion_digital",
+    q:"¿Actúa principalmente dentro de entornos digitales o la red?",
+    hint:"Su práctica está en internet, plataformas, código, interfaces — no en el espacio físico como medio principal.",
+    yes:{ H:3, G:3, E:2, I:2, L:2, B:2, A:1, N:1 },
+    no: { J:3, D:2, M:2, F:1, C:1, K:1 }
+  },
+  { id:"cuerpo_central",
+    q:"¿El cuerpo (físico o virtual) es un elemento central de su práctica?",
+    hint:"Usa su propio cuerpo, cuerpos ajenos, representaciones de cuerpos o la ausencia del cuerpo como núcleo de la obra.",
+    yes:{ C:3, E:3, J:2, D:2, B:1, H:1 },
+    no: { G:2, K:2, L:2, I:2, M:1, A:1 }
+  },
+  { id:"colectivo",
+    q:"¿Es o fue parte de un colectivo, movimiento o red colaborativa?",
+    hint:"No trabaja en solitario como figura individual — su práctica está enmarcada en un grupo, colectivo o campaña.",
+    yes:{ M:3, H:2, A:2, F:1, J:1, K:1 },
+    no: { B:2, I:2, L:2, D:2, G:1, N:1 }
+  },
+  // ── BLOQUE 2: vínculo con sistema ──
+  { id:"dentro_sistema",
+    q:"¿Opera desde adentro del sistema que critica?",
+    hint:"No es externa al poder que cuestiona — trabaja en instituciones, plataformas o lenguajes hegemónicos para subvertirlos.",
+    yes:{ A:3, K:3, H:2, G:2, M:2 },
+    no: { B:2, N:2, F:2, I:1, L:1 }
+  },
+  { id:"hackeo_intervencion",
+    q:"¿Hackea, interviene o subvierte sistemas técnicos, plataformas o lenguajes?",
+    hint:"Manipula código, plataformas, bases de datos, sistemas operativos o formatos establecidos con intención crítica.",
+    yes:{ H:4, G:3, E:2, A:2, K:1 },
+    no: { B:2, D:2, I:2, F:2, L:1, N:1 }
+  },
+  { id:"invisibilidad",
+    q:"¿Su práctica implica ocultamiento, anonimato o presencia invisible?",
+    hint:"Trabaja con alias, secreto, esteganografía, ausencia deliberada, perfil mínimo o identidad velada.",
+    yes:{ I:4, E:3, L:3, D:2, H:1, B:1 },
+    no: { A:2, J:2, M:2, K:1, G:1 }
+  },
+  { id:"desplazamiento",
+    q:"¿Su figura implica moverse estratégicamente entre espacios, plataformas o identidades?",
+    hint:"Cambia de registro, de plataforma, de identidad o de posición según el contexto — nunca fija en un solo lugar.",
+    yes:{ J:4, N:4, F:3, I:2, B:1 },
+    no: { K:2, A:2, G:2, M:1, E:1 }
+  },
+  // ── BLOQUE 3: identidad y género ──
+  { id:"identidad_construida",
+    q:"¿Trabaja con la construcción, deconstrucción o multiplicación de identidades?",
+    hint:"Cuestiona quién es, juega con el yo, produce avatares, personajes, alter egos o identidades en tránsito.",
+    yes:{ C:4, D:3, I:3, N:2, E:2, B:1 },
+    no: { A:1, M:1, G:1, K:1 }
+  },
+  { id:"queer_norma",
+    q:"¿Su trabajo rompe o cuestiona normas de género y/o sexualidad?",
+    hint:"Explícitamente queer, trans, no-binarie, o que critica la heteronormatividad y las asignaciones binarias de género.",
+    yes:{ C:4, F:3, H:2, E:2, J:1 },
+    no: { K:2, M:2, G:1, A:1, B:1 }
+  },
+  { id:"cuerpo_maquina",
+    q:"¿Trabaja con la fusión o tensión entre lo humano y lo tecnológico / mecánico?",
+    hint:"Cyborg, posthumano, prótesis tecnológicas, cuerpo-código, interfaces corporales, biopolítica del cuerpo digital.",
+    yes:{ E:5, C:3, G:2, A:1, B:1 },
+    no: { F:2, K:2, I:2, L:2, D:1 }
+  },
+  // ── BLOQUE 4: relación con el archivo y el lenguaje ──
+  { id:"archivo_acumulacion",
+    q:"¿Su práctica acumula, archiva o trabaja con repositorios de datos, imágenes o textos?",
+    hint:"Trabaja con bases de datos, archivos, colecciones, inventarios o la acumulación como forma estética.",
+    yes:{ K:3, L:3, G:3, H:2, B:2, I:1 },
+    no: { J:2, N:2, F:2, D:1 }
+  },
+  { id:"texto_lenguaje",
+    q:"¿El lenguaje escrito es su medio o herramienta principal?",
+    hint:"Escritura, ensayo, código como texto, poesía, manifiestos, tipografía, publicación.",
+    yes:{ K:4, L:3, F:2, I:2, A:1 },
+    no: { E:2, G:2, J:2, N:1, B:1 }
+  },
+  { id:"ironia_parodia",
+    q:"¿Usa la ironía, la parodia o el humor crítico como estrategia?",
+    hint:"No enfrenta al poder de frente — lo desactiva con ironía, cita paródica, humor o inversión del discurso.",
+    yes:{ F:3, K:3, H:2, L:2, C:1, A:1 },
+    no: { J:2, E:2, B:2, M:1, G:1 }
+  },
+  // ── BLOQUE 5: escala y visibilidad ──
+  { id:"escala_masiva",
+    q:"¿Su impacto o práctica opera a escala masiva, viral o colectiva?",
+    hint:"No es nicho — llega a multitudes, usa plataformas de masas, genera movimientos o tendencias.",
+    yes:{ M:4, A:3, H:2, K:1, J:1 },
+    no: { I:3, L:3, B:2, E:2, N:1, D:1 }
+  },
+  { id:"observacion_pasiva",
+    q:"¿Observa, escucha o acumula sin intervenir activamente?",
+    hint:"Lurk, deriva, espía, registra — pero no interrumpe ni interpela directamente.",
+    yes:{ L:5, B:3, F:3, I:2 },
+    no: { H:3, A:3, J:3, M:2, K:1 }
+  },
+  { id:"efimero_obsoleto",
+    q:"¿Su trabajo aborda la obsolescencia, lo efímero o el archivo que se pierde?",
+    hint:"Medios muertos, soportes que fallan, identidades que desaparecen, la memoria digital como algo frágil.",
+    yes:{ N:5, L:3, B:2, E:1, I:1 },
+    no: { H:2, A:2, M:2, K:1, G:1 }
+  },
+  // ── BLOQUE 6: geografía y posición ──
+  { id:"latinoamerica",
+    q:"¿Su práctica está anclada en América Latina o trabaja desde ese contexto?",
+    hint:"No es solo origen — su trabajo dialoga con la realidad latinoamericana, sus condiciones o sus referentes.",
+    yes:{ A:2, J:2, M:2, B:1, F:1, D:1 },
+    no: { G:2, E:2, K:2, L:1, H:1 }
+  },
+  { id:"academia_teoria",
+    q:"¿Su práctica tiene un componente teórico o académico fuerte?",
+    hint:"Escribe ensayo, teoriza su práctica, es también investigadora, publica en contextos académicos.",
+    yes:{ K:4, A:2, H:2, M:2, F:1 },
+    no: { I:3, N:2, B:2, J:2, L:1 }
+  },
+  { id:"cotidiano_domestico",
+    q:"¿Trabaja con lo cotidiano, lo doméstico o lo íntimo?",
+    hint:"El material de su obra viene del hogar, la rutina, la vida privada, las tareas del cuidado o la intimidad.",
+    yes:{ D:5, B:3, I:2, A:1 },
+    no: { G:3, H:2, E:2, M:2, J:1 }
+  },
+];
+
+/* ═══════════════════════════════════════
+   MOTIVOS DE RESULTADO (para mostrar al final)
+═══════════════════════════════════════ */
+const REASONS = {
+  A:"Su trabajo usa el arte como intervención política directa. Opera desde dentro del sistema que critica — lee lo hegemónico esteganográficamente y lo subvierte.",
+  B:"Navega sin rumbo fijo, guiada por la curiosidad y lo íntimo. La pantalla como jardín secreto, la red como espacio de búsqueda espiritual más que política.",
+  C:"Su práctica deconstruye y reconstruye identidades. <em>No se nace así, se deviene.</em> Performatividad, desidentificación, cuerpos que no caben en las normas.",
+  D:"Habita la red desde lo cotidiano. El yo como actuación, la máscara como hogar. Trabaja con la identidad construida en los márgenes del espacio doméstico.",
+  E:"Oculta mensajes dentro de mensajes. Trabaja en la frontera entre lo orgánico y lo digital — el cyborg como figura política, el código como piel.",
+  F:"Deambula por la red sin pertenecer a ningún lugar. Observa irónicamente, no interviene directamente. Lo fabuloso como resistencia a toda clasificación.",
+  G:"Conoce el sistema desde adentro — y lo interroga. Lee las vísceras de la red, los datos, los algoritmos. El saber técnico como posición crítica.",
+  H:"Interviene, hackea, subvierte. Opera con conciencia de que está siendo clasificada — y lo convierte en arma. El hacktivismo como metaficción política.",
+  I:"Está pero no se ve. Presencia mínima, identidad dispersa. La compulsión de estar conectada sin mostrarse — el chat como modo de ser otro.",
+  J:"Se desplaza estratégicamente entre espacios. Nunca fija, siempre en movimiento. La multiplicidad como resistencia a todo sistema de captura.",
+  K:"Reproduce, cita, remixea con conciencia plena del gesto. El lenguaje académico como material — sabe que al usarlo también lo está siendo.",
+  L:"Observa todo sin participar. Acumula, archiva, guarda. La apertura radical del etcétera — la lista que nunca se cierra.",
+  M:"Su práctica es colectiva, sin centro. Identidad diluida en lo común — la multitud como forma política, el anonimato del movimiento.",
+  N:"Cambia constantemente. Identidades efímeras, plataformas abandonadas, perfiles que mueren. <em>Devenir-mosca:</em> vivir lo que dura una conexión.",
+};
+
+/* ═══════════════════════════════════════
+   ENGINE
+═══════════════════════════════════════ */
+let scores = {};
+let qIndex = 0;
+let trail = [];
+
+function init() {
+  Object.keys(NETIANAS).forEach(k => scores[k] = 0);
+  qIndex = 0;
+  trail = [];
+  renderQuestion();
+}
+
+function answer(val) {
+  const q = QUESTIONS[qIndex];
+  const map = val === 'yes' ? q.yes : q.no;
+  trail.push({ q: q.q, a: val });
+
+  Object.entries(map).forEach(([k, pts]) => {
+    scores[k] = (scores[k] || 0) + pts;
+  });
+
+  qIndex++;
+
+  // Early exit if confident after at least 8 questions
+  if (qIndex >= 8) {
+    const sorted = getSorted();
+    const top = sorted[0];
+    const second = sorted[1];
+    const total = Object.values(scores).reduce((a,b)=>a+b,0);
+    const confidence = total > 0 ? Math.round((top.score / total) * 100) : 0;
+    if (confidence >= 40 && top.score - second.score >= 8 && qIndex >= 12) {
+      showResult();
+      return;
+    }
+  }
+
+  if (qIndex >= QUESTIONS.length) {
+    showResult();
+    return;
+  }
+  renderQuestion();
+}
+
+function skip() {
+  qIndex++;
+  if (qIndex >= QUESTIONS.length) { showResult(); return; }
+  renderQuestion();
+}
+
+function getSorted() {
+  return Object.entries(scores)
+    .map(([k,v])=>({key:k, score:v}))
+    .sort((a,b)=>b.score - a.score);
+}
+
+function getConfidence() {
+  const sorted = getSorted();
+  const total = Object.values(scores).reduce((a,b)=>a+b,0);
+  if (total === 0) return 0;
+  return Math.round((sorted[0].score / total) * 100);
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[qIndex];
+  const pct = Math.round((qIndex / QUESTIONS.length) * 100);
+  const conf = qIndex > 0 ? getConfidence() : 0;
+
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-label').textContent = `pregunta ${qIndex + 1} / ${QUESTIONS.length}`;
+  document.getElementById('prog-confidence').textContent = `confianza: ${conf}%`;
+
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'q-wrap';
+
+  // question
+  wrap.innerHTML = `
+    <div class="q-num">// PREGUNTA ${String(qIndex + 1).padStart(2,'0')}</div>
+    <div class="q-text">${q.q}</div>
+    ${q.hint ? `<div class="q-hint">${q.hint}</div>` : ''}
+    <div class="ans-wrap">
+      <button class="ans-btn yes" id="btn-yes">SÍ →</button>
+      <button class="ans-btn no"  id="btn-no">NO →</button>
+    </div>
+    <button class="skip-btn" id="btn-skip">[ no lo sé / saltar ]</button>`;
+
+  // live scores if past question 5
+  if (qIndex >= 5) {
+    const sorted = getSorted();
+    const max = sorted[0].score || 1;
+    const scoreHTML = `
+      <div class="trail" style="margin-top:1.2rem;">
+        <div class="trail-lbl">// candidatas activas</div>
+        ${sorted.slice(0,6).map(({key,score}) => {
+          const n = NETIANAS[key];
+          const pct = Math.round((score/max)*100);
+          return `<div class="score-row">
+            <span class="score-letter">${n.l}</span>
+            <span class="score-alias">${n.a}</span>
+            <div class="score-bar-wrap"><div class="score-bar ${key===sorted[0].key?'top':''}" style="width:${pct}%"></div></div>
+            <span class="score-val">${score}pts</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    wrap.innerHTML += scoreHTML;
+  }
+
+  // trail of past answers
+  if (trail.length > 0) {
+    const trailHTML = `
+      <div class="trail">
+        <div class="trail-lbl">// recorrido</div>
+        ${trail.slice(-4).map(t=>`
+          <div class="trail-item">
+            <span class="tq">${t.q.substring(0,50)}${t.q.length>50?'…':''}</span>
+            <span class="ta">${t.a==='yes'?'SÍ':'NO'}</span>
+          </div>`).join('')}
+      </div>`;
+    wrap.innerHTML += trailHTML;
+  }
+
+  main.appendChild(wrap);
+
+  document.getElementById('btn-yes').addEventListener('click', ()=>answer('yes'));
+  document.getElementById('btn-no').addEventListener('click', ()=>answer('no'));
+  document.getElementById('btn-skip').addEventListener('click', skip);
+  main.scrollTop = 0;
+}
+
+function showResult() {
+  const sorted = getSorted();
+  const top = sorted[0];
+  const total = Object.values(scores).reduce((a,b)=>a+b,0);
+  const max = top.score || 1;
+
+  document.getElementById('prog-fill').style.width = '100%';
+  document.getElementById('prog-label').textContent = `análisis completado`;
+  const conf = total > 0 ? Math.round((top.score/total)*100) : 0;
+  document.getElementById('prog-confidence').textContent = `confianza: ${conf}%`;
+
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'result-wrap';
+
+  const n = NETIANAS[top.key];
+
+  wrap.innerHTML = `
+    <div class="result-header">// ANÁLISIS COMPLETADO · ${trail.length} preguntas respondidas</div>
+    <div class="result-primary">
+      <div class="r-letter">${n.l}</div>
+      <div class="r-alias">${n.a}</div>
+      <div class="r-name">${n.n}</div>
+      <div class="r-why">${REASONS[top.key]}</div>
+      <div class="result-tags" style="margin-top:.8rem;">
+        <div class="rt-lbl">// tags compartidos con esta netiana</div>
+        <div class="rt-wrap" id="shared-tags"></div>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+    <div class="trail-lbl" style="margin-bottom:.6rem;">// distribución completa</div>
+    <div class="result-scores" id="all-scores"></div>
+
+    <button class="restart-btn" id="restart-btn">[ clasificar otra referente ]</button>`;
+
+  main.appendChild(wrap);
+
+  // all scores
+  const scoresEl = document.getElementById('all-scores');
+  sorted.forEach(({key, score}, i) => {
+    const nn = NETIANAS[key];
+    const pct = Math.round((score/max)*100);
+    const row = document.createElement('div');
+    row.className = 'score-row';
+    row.innerHTML = `
+      <span class="score-letter">${nn.l}</span>
+      <span class="score-alias">${nn.a}</span>
+      <div class="score-bar-wrap"><div class="score-bar ${i===0?'top':''}" style="width:${pct}%"></div></div>
+      <span class="score-val">${score}pts</span>`;
+    scoresEl.appendChild(row);
+  });
+
+  // shared tags (sim via yes-answers)
+  const sharedTags = document.getElementById('shared-tags');
+  const topYesTags = trail
+    .filter(t=>t.a==='yes')
+    .map(t=>QUESTIONS.find(q=>q.q===t.q))
+    .filter(Boolean)
+    .filter(q => (q.yes[top.key]||0) >= 2)
+    .map(q => {
+      // find tag name from question id
+      return q.id.replace(/_/g,' ');
+    });
+
+  if (topYesTags.length === 0) {
+    sharedTags.innerHTML = '<span style="font-size:.58rem;color:var(--gd);">respuestas insuficientes para extraer tags</span>';
+  } else {
+    topYesTags.slice(0,6).forEach(t => {
+      const span = document.createElement('span');
+      span.className = 'rt-tag';
+      span.textContent = t;
+      sharedTags.appendChild(span);
+    });
+  }
+
+  document.getElementById('restart-btn').addEventListener('click', () => {
+    scores = {};
+    init();
+  });
+
+  main.scrollTop = 0;
+}
+
+// ── BOOT ──
+init();
+</script>
+</body>
+</html>
